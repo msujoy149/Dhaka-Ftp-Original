@@ -1,0 +1,23 @@
+[
+    {
+        "fileHash": "sha256-3c62493b20b8a35b6d1939bf981f9f4d207efb3acc8f7e089fcfa137b1db9298",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/msujoy149/Dhaka-Ftp-Original",
+        "fileSize": 11658,
+        "status": 1,
+        "language": "bn",
+        "authors": [
+            "Dhaka FTP"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime"
+        ],
+        "version": 1,
+        "internalName": "DhakaFTP",
+        "description": "Dhaka FTP",
+        "url": "https://raw.githubusercontent.com/msujoy149/Dhaka-Ftp-Original/builds/DhakaFTP.cs3",
+        "name": "DhakaFTP"
+    }
+]
