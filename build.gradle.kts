@@ -13,10 +13,9 @@ buildscript {
     dependencies {
         classpath("com.android.tools.build:gradle:8.7.3")
 
-        // Cloudstream Gradle plugin
-        classpath("com.github.recloudstream:gradle:-SNAPSHOT")
+        // Fixed CloudStream Gradle plugin version
+        classpath("com.github.recloudstream:gradle:81b1d424d2")
 
-        // Current Kotlin Gradle plugin
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.0")
     }
 }
@@ -83,16 +82,20 @@ subprojects {
     dependencies {
         val implementation by configurations
 
-        // Current CloudStream library dependency
         implementation(
             "com.github.recloudstream.cloudstream:library:-SNAPSHOT"
         )
 
         implementation(kotlin("stdlib"))
-        implementation("com.github.Blatzar:NiceHttp:0.4.11")
-        implementation("org.jsoup:jsoup:1.18.3")
 
-        // Keep Jackson at 2.13.1 for older Android compatibility
+        implementation(
+            "com.github.Blatzar:NiceHttp:0.4.11"
+        )
+
+        implementation(
+            "org.jsoup:jsoup:1.18.3"
+        )
+
         implementation(
             "com.fasterxml.jackson.module:jackson-module-kotlin:2.13.1"
         )
