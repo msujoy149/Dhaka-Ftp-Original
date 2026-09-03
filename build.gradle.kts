@@ -13,7 +13,7 @@ buildscript {
     dependencies {
         classpath("com.android.tools.build:gradle:8.7.3")
 
-        // Fixed CloudStream Gradle plugin version
+        // CloudStream Gradle plugin
         classpath("com.github.recloudstream:gradle:81b1d424d2")
 
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.0")
@@ -80,12 +80,13 @@ subprojects {
     }
 
     dependencies {
+        val cloudstream by configurations
         val implementation by configurations
 
-        implementation(
-            "com.github.recloudstream.cloudstream:library:-SNAPSHOT"
-        )
+        // CloudStream API
+        cloudstream("com.lagradost:cloudstream3:pre-release")
 
+        // Other dependencies
         implementation(kotlin("stdlib"))
 
         implementation(
