@@ -3,7 +3,6 @@ package com.dhakaftp
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
-import java.net.URLEncoder
 
 class DhakaFTP : MainAPI() {
 
@@ -21,122 +20,216 @@ class DhakaFTP : MainAPI() {
         TvType.Anime
     )
 
+    /*
+     * Main categories.
+     *
+     * The folders INSIDE these categories are completely dynamic.
+     * No year or folder name is hardcoded.
+     */
+    private val categoryPages = listOf(
+        "English" to
+                "http://172.16.50.7/DHAKA-FLIX-7/English%20Movies/",
+
+        "Hindi" to
+                "http://172.16.50.14/DHAKA-FLIX-14/Hindi%20Movies/",
+
+        "Bangla" to
+                "http://172.16.50.7/DHAKA-FLIX-7/Kolkata%20Bangla%20Movies/",
+
+        "South Indian" to
+                "http://172.16.50.14/DHAKA-FLIX-14/SOUTH%20INDIAN%20MOVIES/Hindi%20Dubbed/",
+
+        "TV / Web Series" to
+                "http://172.16.50.12/DHAKA-FLIX-12/TV-WEB-Series/",
+
+        "K-Drama" to
+                "http://172.16.50.14/DHAKA-FLIX-14/KOREAN%20TV%20%26%20WEB%20Series/",
+
+        "Anime" to
+                "http://172.16.50.14/DHAKA-FLIX-14/Animation%20Movies/"
+    )
+
     override suspend fun getMainPage(
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
 
-        val pages = listOf(
-            "English" to
-                    "http://172.16.50.7/DHAKA-FLIX-7/English%20Movies/",
-
-            "Hindi" to
-                    "http://172.16.50.14/DHAKA-FLIX-14/Hindi%20Movies/",
-
-            "Bangla" to
-                    "http://172.16.50.7/DHAKA-FLIX-7/Kolkata%20Bangla%20Movies/",
-
-            "South Indian" to
-                    "http://172.16.50.14/DHAKA-FLIX-14/SOUTH%20INDIAN%20MOVIES/Hindi%20Dubbed/",
-
-            "TV / Web Series" to
-                    "http://172.16.50.12/DHAKA-FLIX-12/TV-WEB-Series/",
-
-            "K-Drama" to
-                    "http://172.16.50.14/DHAKA-FLIX-14/KOREAN%20TV%20%26%20WEB%20Series/",
-
-            "Anime" to
-                    "http://172.16.50.14/DHAKA-FLIX-14/Animation%20Movies/"
-        )
-
         val home = ArrayList<HomePageList>()
 
-        for ((title, url) in pages) {
+        /*
+         * Every category is scanned directly from the server.
+         * Any folder added later will automatically be detected.
+         */
+        for ((categoryName, categoryUrl) in categoryPages) {
 
             try {
 
-                val items = readDirectory(url)
-                    .mapNotNull { it.toSearchResponse() }
+                val folders = readDirectory(categoryUrl)
+
+                val items = folders
+                    .filter { it.attr("href").endsWith("/") }
+                    .mapNotNull { element ->
+
+                        val folderName =
+                            element.text().trim()
+
+                        val href =
+                            element.attr("href")
+
+                        if (
+                            folderName.isBlank() ||
+                            href.isBlank()
+                        ) {
+                            null
+                        } else {
+
+                            val folderUrl =
+                                fixUrl(
+                                    categoryUrl,
+                                    href
+                                )
+
+                            newMovieSearchResponse(
+                                cleanName(folderName),
+                                folderUrl,
+                                TvType.Movie
+                            )
+                        }
+                    }
 
                 if (items.isNotEmpty()) {
+
                     home.add(
                         HomePageList(
-                            title,
+                            categoryName,
                             items
                         )
                     )
                 }
 
             } catch (_: Exception) {
-                // Ignore unavailable server/category
+                // Ignore unavailable category
             }
         }
 
-        return HomePageResponse(home)
+        return newHomePageResponse(home)
     }
 
+    /*
+     * Search
+     *
+     * Searches through:
+     *
+     * Category
+     *   -> Folder
+     *      -> Sub-folder
+     *
+     * Folder names are NOT assumed to be years.
+     */
     override suspend fun search(
         query: String
     ): List<SearchResponse> {
 
-        val results = ArrayList<SearchResponse>()
+        val results =
+            ArrayList<SearchResponse>()
 
-        val pages = listOf(
-            "http://172.16.50.7/DHAKA-FLIX-7/English%20Movies/",
-            "http://172.16.50.14/DHAKA-FLIX-14/Hindi%20Movies/",
-            "http://172.16.50.7/DHAKA-FLIX-7/Kolkata%20Bangla%20Movies/",
-            "http://172.16.50.14/DHAKA-FLIX-14/SOUTH%20INDIAN%20MOVIES/Hindi%20Dubbed/",
-            "http://172.16.50.12/DHAKA-FLIX-12/TV-WEB-Series/",
-            "http://172.16.50.14/DHAKA-FLIX-14/KOREAN%20TV%20%26%20WEB%20Series/",
-            "http://172.16.50.14/DHAKA-FLIX-14/Animation%20Movies/"
-        )
-
-        for (categoryUrl in pages) {
+        for ((_, categoryUrl) in categoryPages) {
 
             try {
 
-                val years = readDirectory(categoryUrl)
+                val folders =
+                    readDirectory(categoryUrl)
 
-                for (year in years) {
+                for (folder in folders) {
 
-                    val yearUrl = year.attr("href")
+                    if (
+                        !folder.attr("href")
+                            .endsWith("/")
+                    ) {
+                        continue
+                    }
 
-                    if (!yearUrl.endsWith("/")) continue
+                    val folderName =
+                        folder.text().trim()
 
-                    val yearFullUrl =
-                        fixUrl(categoryUrl, yearUrl)
+                    val folderUrl =
+                        fixUrl(
+                            categoryUrl,
+                            folder.attr("href")
+                        )
 
-                    val movies = readDirectory(yearFullUrl)
+                    /*
+                     * Check the first folder itself.
+                     */
+                    if (
+                        folderName.contains(
+                            query,
+                            ignoreCase = true
+                        )
+                    ) {
 
-                    for (movie in movies) {
-
-                        val movieName =
-                            movie.text().trim()
-
-                        if (
-                            movieName.contains(
-                                query,
-                                ignoreCase = true
+                        results.add(
+                            newMovieSearchResponse(
+                                cleanName(folderName),
+                                folderUrl,
+                                TvType.Movie
                             )
-                        ) {
+                        )
+                    }
 
-                            val href =
-                                movie.attr("href")
+                    /*
+                     * Search inside the folder.
+                     * This works whether the folder is named:
+                     *
+                     * (2026)
+                     * (2027)
+                     * Nepal Travel
+                     * সত্যচিত্রায় Films
+                     * etc.
+                     */
+                    try {
 
-                            val movieUrl =
+                        val subFolders =
+                            readDirectory(folderUrl)
+
+                        for (subFolder in subFolders) {
+
+                            if (
+                                !subFolder.attr("href")
+                                    .endsWith("/")
+                            ) {
+                                continue
+                            }
+
+                            val subFolderName =
+                                subFolder.text().trim()
+
+                            if (
+                                !subFolderName.contains(
+                                    query,
+                                    ignoreCase = true
+                                )
+                            ) {
+                                continue
+                            }
+
+                            val subFolderUrl =
                                 fixUrl(
-                                    yearFullUrl,
-                                    href
+                                    folderUrl,
+                                    subFolder.attr("href")
                                 )
 
                             results.add(
                                 newMovieSearchResponse(
-                                    cleanName(movieName),
-                                    movieUrl,
+                                    cleanName(subFolderName),
+                                    subFolderUrl,
                                     TvType.Movie
                                 )
                             )
                         }
+
+                    } catch (_: Exception) {
+                        // Continue searching
                     }
                 }
 
@@ -148,6 +241,12 @@ class DhakaFTP : MainAPI() {
         return results
     }
 
+    /*
+     * Opens a movie/video folder.
+     *
+     * Images/posters are completely ignored.
+     * Only actual video files are searched.
+     */
     override suspend fun load(
         url: String
     ): LoadResponse? {
@@ -156,49 +255,24 @@ class DhakaFTP : MainAPI() {
             app.get(url).document
 
         val title =
-            document
-                .select("a")
-                .map { it.text().trim() }
-                .firstOrNull {
-                    it.endsWith(
-                        ".mkv",
-                        true
-                    ) ||
-                    it.endsWith(
-                        ".mp4",
-                        true
-                    )
-                }
-                ?.let {
-                    cleanName(
-                        it.substringBeforeLast(".")
-                    )
-                }
-                ?: cleanName(
-                    url
-                        .trimEnd('/')
-                        .substringAfterLast('/')
-                )
+            cleanName(
+                url
+                    .trimEnd('/')
+                    .substringAfterLast('/')
+            )
 
+        /*
+         * Find the first supported video file.
+         */
         val videoFile =
             document
                 .select("a")
-                .firstOrNull {
-                    val href =
-                        it.attr("href")
+                .firstOrNull { element ->
 
-                    href.endsWith(
-                        ".mkv",
-                        true
-                    ) ||
-                    href.endsWith(
-                        ".mp4",
-                        true
-                    ) ||
-                    href.endsWith(
-                        ".webm",
-                        true
-                    )
+                    val href =
+                        element.attr("href")
+
+                    isVideoFile(href)
                 }
                 ?: return null
 
@@ -208,25 +282,17 @@ class DhakaFTP : MainAPI() {
                 videoFile.attr("href")
             )
 
-        val poster =
-            document
-                .select("img")
-                .firstOrNull()
-                ?.attr("src")
-                ?.let {
-                    fixUrl(url, it)
-                }
-
         return newMovieLoadResponse(
             title,
             url,
             TvType.Movie,
             videoUrl
-        ) {
-            this.posterUrl = poster
-        }
+        )
     }
 
+    /*
+     * Sends the direct video URL to CloudStream player.
+     */
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -235,19 +301,19 @@ class DhakaFTP : MainAPI() {
     ): Boolean {
 
         callback(
-            ExtractorLink(
-                this.name,
-                this.name,
-                data,
-                "",
-                Qualities.Unknown.value,
-                false
+            newExtractorLink(
+                source = this.name,
+                name = this.name,
+                url = data
             )
         )
 
         return true
     }
 
+    /*
+     * Reads a directory listing from the server.
+     */
     private suspend fun readDirectory(
         url: String
     ): List<Element> {
@@ -257,9 +323,10 @@ class DhakaFTP : MainAPI() {
 
         return document
             .select("a")
-            .filter {
+            .filter { element ->
+
                 val href =
-                    it.attr("href")
+                    element.attr("href")
 
                 href.isNotBlank() &&
                 href != "../" &&
@@ -267,30 +334,27 @@ class DhakaFTP : MainAPI() {
             }
     }
 
-    private fun Element.toSearchResponse():
-            SearchResponse? {
+    /*
+     * Checks whether a link points to a video.
+     */
+    private fun isVideoFile(
+        path: String
+    ): Boolean {
 
-        val href =
-            attr("href")
+        val lower =
+            path.lowercase()
 
-        if (href.isBlank()) {
-            return null
-        }
-
-        val name =
-            text().trim()
-
-        if (name.isBlank()) {
-            return null
-        }
-
-        return newMovieSearchResponse(
-            cleanName(name),
-            href,
-            TvType.Movie
-        )
+        return lower.endsWith(".mkv") ||
+                lower.endsWith(".mp4") ||
+                lower.endsWith(".webm") ||
+                lower.endsWith(".avi") ||
+                lower.endsWith(".mov") ||
+                lower.endsWith(".m4v")
     }
 
+    /*
+     * Cleans folder/file names for display.
+     */
     private fun cleanName(
         value: String
     ): String {
@@ -298,13 +362,18 @@ class DhakaFTP : MainAPI() {
         return value
             .removeSuffix("/")
             .replace(
-                Regex("\\.(mkv|mp4|webm)$"),
-                "",
-                ignoreCase = true
+                Regex(
+                    "\\.(mkv|mp4|webm|avi|mov|m4v)$",
+                    RegexOption.IGNORE_CASE
+                ),
+                ""
             )
             .trim()
     }
 
+    /*
+     * Converts relative links into complete URLs.
+     */
     private fun fixUrl(
         base: String,
         path: String
@@ -312,25 +381,55 @@ class DhakaFTP : MainAPI() {
 
         if (
             path.startsWith(
-                "http://"
+                "http://",
+                ignoreCase = true
             ) ||
             path.startsWith(
-                "https://"
+                "https://",
+                ignoreCase = true
             )
         ) {
             return path
         }
 
-        return when {
-            path.startsWith("/") -> {
-                "http://172.16.50.7$path"
+        return if (
+            path.startsWith("/")
+        ) {
+
+            /*
+             * The server paths are private LAN paths.
+             * Keep the original host from the path.
+             */
+            when {
+                path.startsWith(
+                    "/DHAKA-FLIX-7"
+                ) -> {
+                    "http://172.16.50.7$path"
+                }
+
+                path.startsWith(
+                    "/DHAKA-FLIX-14"
+                ) -> {
+                    "http://172.16.50.14$path"
+                }
+
+                path.startsWith(
+                    "/DHAKA-FLIX-12"
+                ) -> {
+                    "http://172.16.50.12$path"
+                }
+
+                else -> {
+                    mainUrl.trimEnd('/') +
+                            path
+                }
             }
 
-            else -> {
-                base.trimEnd('/') +
+        } else {
+
+            base.trimEnd('/') +
                     "/" +
                     path.trimStart('/')
-            }
         }
     }
 }
