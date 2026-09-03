@@ -13,16 +13,6 @@ class DhakaFTP : MainAPI() {
         TvType.Anime
     )
 
-    override val hasMainPage = true
+    override val hasMainPage = false
     override val hasQuickSearch = true
-
-    override val mainPage = mainPageOf(
-        "english" to "English",
-        "hindi" to "Hindi",
-        "bangla" to "Bangla",
-        "south-indian" to "South Indian",
-        "tv" to "TV / Web Series",
-        "k-drama" to "K-Drama",
-        "anime" to "Anime"
-    )
 }
